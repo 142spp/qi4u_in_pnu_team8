@@ -16,11 +16,13 @@ services:
   frontend:
     build:
       context: ./front
+    command: npm run dev
     ports:
       - "3000:3000"
     volumes:
       - ./front:/app
       - /app/node_modules
+      - /app/.next
     environment:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true

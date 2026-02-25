@@ -14,23 +14,30 @@ const END_HOUR = 20;
 const HOUR_HEIGHT = 60; // pixels per hour
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 
-// Colors for different categories or just random assignments based on ID length
-const getBgColor = (id: string) => {
+// Colors for different categories sequentially assigned
+const getBgColor = (index: number) => {
     const colors = [
         "bg-primary/20 border-primary/40 text-primary-foreground",
         "bg-blue-500/20 border-blue-500/40 text-blue-900",
         "bg-green-500/20 border-green-500/40 text-green-900",
         "bg-orange-500/20 border-orange-500/40 text-orange-900",
         "bg-purple-500/20 border-purple-500/40 text-purple-900",
+        "bg-pink-500/20 border-pink-500/40 text-pink-900",
+        "bg-teal-500/20 border-teal-500/40 text-teal-900",
+        "bg-yellow-500/20 border-yellow-500/40 text-yellow-900",
+        "bg-indigo-500/20 border-indigo-500/40 text-indigo-900",
+        "bg-rose-500/20 border-rose-500/40 text-rose-900",
+        "bg-cyan-500/20 border-cyan-500/40 text-cyan-900",
+        "bg-emerald-500/20 border-emerald-500/40 text-emerald-900",
     ];
-    return colors[id.length % colors.length];
+    return colors[index % colors.length];
 };
 
 export default function TimetableView({ schedule }: TimetableViewProps) {
     // Parse all lectures into renderable blocks
     const renderedBlocks = useMemo(() => {
         const blocks: any[] = [];
-        schedule.forEach(lec => {
+        schedule.forEach((lec, index) => {
             const timeBlocks = parseTimeRoom(lec.time_room);
             timeBlocks.forEach(tb => {
                 // If it starts before 9, clamp it.
@@ -42,6 +49,7 @@ export default function TimetableView({ schedule }: TimetableViewProps) {
                 blocks.push({
                     id: lec.id + tb.dayIndex,
                     lecture: lec,
+                    lectureIndex: index,
                     dayIndex: tb.dayIndex,
                     top: startOffsetHours * HOUR_HEIGHT,
                     height: durationHours * HOUR_HEIGHT,
@@ -89,7 +97,7 @@ export default function TimetableView({ schedule }: TimetableViewProps) {
                         {renderedBlocks.map((block) => (
                             <div
                                 key={block.id}
-                                className={`absolute left-0 right-0 mx-1 p-1.5 rounded text-xs border overflow-hidden leading-tight ${getBgColor(block.lecture.id)}`}
+                                className={`absolute left-0 right-0 mx-1 p-1.5 rounded text-xs border overflow-hidden leading-tight ${getBgColor(block.lectureIndex)}`}
                                 style={{
                                     top: block.top,
                                     height: block.height - 2,
