@@ -6,7 +6,7 @@ global_lectures_store = []
 
 def load_lectures():
     global global_lectures_store
-    data_path = pathlib.Path(__file__).parent.parent.parent.parent / "data" / "lectures.csv"
+    data_path = pathlib.Path(__file__).parent.parent.parent / "data" / "lectures.csv"
     
     if not data_path.exists():
         print(f"Warning: Data file not found at {data_path}")

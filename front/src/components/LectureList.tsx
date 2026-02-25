@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Search } from 'lucide-react';
 import React, { useEffect, useState, useMemo } from 'react';
 
-const FASTAPI_URL = "http://localhost:8000/api";
+const FASTAPI_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 export default function LectureList() {
     const { lectures, setLectures, selectedIds, toggleSelection, targetCredits, setTargetCredits } = useLectureStore();

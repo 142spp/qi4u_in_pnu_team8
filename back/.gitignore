@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.env
+.env.*
+*.bak
+*.swp
+
+# Local sqlite or other db files if any
+*.sqlite3
+*.db
+
+# Data files (Tracked for deployment)
+# data/ (uncomment if you want to ignore)
+outputs/

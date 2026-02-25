@@ -9,7 +9,7 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-const FASTAPI_URL = "http://localhost:8000/api";
+const FASTAPI_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 export default function OptimizationPanel() {
     const { selectedIds, targetCredits, setOptimizedSchedule } = useLectureStore();
