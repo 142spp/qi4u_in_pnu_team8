@@ -20,14 +20,25 @@ def load_lectures():
 
     # Process to list of dicts for easy access
     global_lectures_store.clear()
+    seen_ids = set()
     for _, row in df.iterrows():
+        lec_id = str(row["교과목번호"]) + "-" + str(row["분반"])
+        if lec_id in seen_ids:
+            continue
+            
+        time_room_val = str(row["시간표"]).strip()
+        if not time_room_val:
+            continue
+            
+        seen_ids.add(lec_id)
+        
         global_lectures_store.append({
-            "id": str(row["교과목번호"]) + "-" + str(row["분반"]),
+            "id": lec_id,
             "number": str(row["교과목번호"]),
             "class_num": str(row["분반"]),
             "name": str(row["교과목명"]),
             "credit": float(row["학점"]) if row["학점"] else 0.0,
-            "time_room": str(row["시간표"]),
+            "time_room": time_room_val,
             "professor": str(row["교수명"]),
             "category": str(row["교과목구분"])
         })

@@ -9,9 +9,23 @@ router = APIRouter()
 
 class OptimizationRequest(BaseModel):
     selected_lecture_ids: List[str]
-    max_credits: Optional[float] = 21.0
-    prefer_contiguous: Optional[bool] = True
-    prefer_free_days: Optional[bool] = False
+    target_credits: Optional[float] = 21.0
+    
+    # Annealing configs
+    max_candidates: Optional[int] = 300
+    total_reads: Optional[int] = 100
+    batch_size: Optional[int] = 100
+    
+    # BQM Weights
+    w_hard_overlap: Optional[float] = 10000.0
+    w_target_credit: Optional[float] = 100.0
+    w_mandatory: Optional[float] = -10000.0
+    w_first_class: Optional[float] = 50.0
+    w_lunch_overlap: Optional[float] = 30.0
+    r_free_day: Optional[float] = 100.0
+    p_free_day_break: Optional[float] = 500.0
+    w_contiguous_reward: Optional[float] = -20.0
+    w_tension_base: Optional[float] = 5.0
 
 @router.get("/lectures")
 def get_lectures():

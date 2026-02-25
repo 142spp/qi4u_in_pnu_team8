@@ -1,16 +1,16 @@
-import time
 import re
 import math
+import random
 from .task_manager import update_task_status
-from ..core.loader import get_lecture_by_id
+from ..core.loader import get_lecture_by_id, get_all_lectures
 from ..utils.time_utils import parse_time_to_range
 from .bqm_builder import build_timetable_bqm
 
+import dimod
 try:
-    import dimod
+    import neal
 except ImportError:
-    pass
-
+    neal = None
 
 def optimize_timetable(task_id: str, preferences: dict):
     """
@@ -23,29 +23,75 @@ def optimize_timetable(task_id: str, preferences: dict):
         if not selected_ids:
             raise ValueError("No lectures provided for optimization.")
             
-        print(f"Task {task_id}: Preparing QUBO for {len(selected_ids)} lectures.")
+        # Treat manually selected IDs as mandatory for the BQM
+        preferences["mandatory_ids"] = selected_ids
+            
+        print(f"Task {task_id}: Preparing QUBO over all lectures with {len(selected_ids)} mandatory selections.")
         
-        # 1. Fetch Lecture Details and Parse Times
+        # 1. Fetch ALL Lecture Details and Parse Times
+        all_lectures_data = get_all_lectures()
+        
+        # Performance Guard: Now scaled up to 1000 thanks to Neal (C++).
+        # 1000 candidates provide a very rich search space while completing in seconds.
+        MAX_CANDIDATES = preferences.get("max_candidates", 300)
+        candidate_pool = []
+        mandatory_pool = []
+        for lec in all_lectures_data:
+            if lec["id"] in selected_ids:
+                mandatory_pool.append(lec)
+            else:
+                candidate_pool.append(lec)
+        
+        # Shuffle candidates for variety
+        random.shuffle(candidate_pool)
+        
+        # Final set = all mandatory + subset of candidates
+        final_pool = mandatory_pool + candidate_pool[:(MAX_CANDIDATES - len(mandatory_pool))]
+        
         lectures = []
-        for lid in selected_ids:
-            lec = get_lecture_by_id(lid)
-            if lec:
-                lec_copy = lec.copy()
-                lec_copy['parsed_time'] = parse_time_to_range(lec['time_room'])
-                lectures.append(lec_copy)
+        for lec in final_pool:
+            lec_copy = lec.copy()
+            lec_copy['parsed_time'] = parse_time_to_range(lec['time_room'])
+            lectures.append(lec_copy)
         
         N = len(lectures)
         if N == 0:
              raise ValueError("None of the selected lectures were found in the database.")
         
         # 2. Build BQM using our algorithmic logic
-        bqm = build_timetable_bqm(lectures, preferences)
+        def bqm_progress(msg, pct):
+            update_task_status(task_id, "PROCESSING", summary=f"Building BQM: {msg} ({pct}%)")
 
-        # 3. Submit to Simulated Annealing Sampler
-        print(f"Task {task_id}: Solving BQM using Simulated Annealing...")
-        sampler = dimod.SimulatedAnnealingSampler()
-        # Num reads determines how many times we run the simulated annealing (more = better chance of finding global min)
-        sampleset = sampler.sample(bqm, num_reads=500)
+        bqm = build_timetable_bqm(lectures, preferences, progress_callback=bqm_progress)
+
+        # 3. Submit to Simulated Annealing Sampler (Batch Processing)
+        print(f"Task {task_id}: Solving BQM using C++ Neal Sampler (Batched)...")
+        
+        if neal:
+            sampler = neal.SimulatedAnnealingSampler()
+        else:
+            sampler = dimod.SimulatedAnnealingSampler()
+            
+        TOTAL_READS = preferences.get("total_reads", 100)
+        BATCH_SIZE = preferences.get("batch_size", 100)
+        
+        # Ensure minimums
+        if BATCH_SIZE <= 0: BATCH_SIZE = 100
+        if TOTAL_READS <= 0: TOTAL_READS = 100
+        
+        num_batches = max(1, TOTAL_READS // BATCH_SIZE)
+        
+        all_samplesets = []
+        for b in range(num_batches):
+            progress_pct = int(((b + 1) / num_batches) * 100)
+            update_task_status(task_id, "PROCESSING", summary=f"Quantum Optimization in progress... ({progress_pct}%)")
+            
+            # Perform batch sampling
+            batch_sampleset = sampler.sample(bqm, num_reads=BATCH_SIZE)
+            all_samplesets.append(batch_sampleset)
+            
+        # Concatenate all results
+        sampleset = dimod.concatenate(all_samplesets)
         
         # 4. Parse Results
         best_sample = sampleset.first.sample
@@ -61,13 +107,80 @@ def optimize_timetable(task_id: str, preferences: dict):
 
         # Basic Check: Calculate total credits for logging
         total_credits_found = sum(lec['credit'] for lec in final_schedule)
+        
+        # Breakdown Energy calculations manually for logging / ui
+        breakdown = {
+            "credit_penalty": 0.0,
+            "1st_period_penalty": 0.0,
+            "lunch_overlap_penalty": 0.0,
+            "free_day_reward": 0.0,
+            "overlap_penalty": 0.0,
+            "contiguous_reward": 0.0,
+            "tension_penalty": 0.0,
+            "mandatory_reward": 0.0,
+        }
+        
+        # Recalculate based on preferences weights
+        T_CREDIT = preferences.get("target_credits", 21.0)
+        W_CREDIT = preferences.get("w_target_credit", 10.0)
+        W_FIRST = preferences.get("w_first_class", 50.0)
+        W_LUNCH = preferences.get("w_lunch_overlap", 30.0)
+        R_FREE = preferences.get("r_free_day", 100.0)
+        P_FREE_BREAK = preferences.get("p_free_day_break", 500.0)
+        W_OVERLAP = preferences.get("w_hard_overlap", 10000.0)
+        W_CONTIG = preferences.get("w_contiguous_reward", -20.0)
+        W_TENSION = preferences.get("w_tension_base", 5.0)
+        W_MAN = preferences.get("w_mandatory", -10000.0)
+        
+        breakdown["credit_penalty"] = round(W_CREDIT * (total_credits_found - T_CREDIT)**2, 2)
+        
+        days_with_classes = set()
+        for lec in final_schedule:
+            if lec["id"] in selected_ids:
+                breakdown["mandatory_reward"] += W_MAN
+            
+            for pt in lec.get('parsed_time', []):
+                days_with_classes.add(pt['day'])
+                if pt['start'] <= 570:
+                    breakdown["1st_period_penalty"] += W_FIRST
+                if max(pt['start'], 720) < min(pt['end'], 780):
+                    breakdown["lunch_overlap_penalty"] += W_LUNCH
+                    
+        # Free day logical reward
+        for d in ['월', '화', '수', '목', '금', '토', '일']:
+            if f"free_{d}" in best_sample and best_sample[f"free_{d}"] == 1:
+                breakdown["free_day_reward"] += -R_FREE
+                if d in days_with_classes:
+                    breakdown["free_day_reward"] += P_FREE_BREAK
+
+        # Pairwise penalties
+        for i in range(len(final_schedule)):
+            for j in range(i+1, len(final_schedule)):
+                lec_i = final_schedule[i]
+                lec_j = final_schedule[j]
+                
+                # Assume check_overlap handles parsed times list
+                for pt_i in lec_i.get('parsed_time', []):
+                    for pt_j in lec_j.get('parsed_time', []):
+                        if pt_i['day'] == pt_j['day']: # Same day only
+                            from ..utils.time_utils import check_overlap, calculate_time_gap
+                            if check_overlap([pt_i], [pt_j]):
+                                breakdown["overlap_penalty"] += W_OVERLAP
+                            else:
+                                gap = calculate_time_gap([pt_i], [pt_j])
+                                if 0 < gap <= 60:
+                                    breakdown["contiguous_reward"] += W_CONTIG
+                                elif 60 < gap <= 180:
+                                    breakdown["tension_penalty"] += round(W_TENSION * math.sqrt(gap), 2)
+
         print(f"Task {task_id}: Optimization complete. Selected {len(final_schedule)} lectures ({total_credits_found} credits). Energy: {energy}")
         
         # Update status
         update_task_status(task_id, "SUCCESS", result={
             "schedule": final_schedule,
             "energy": energy,
-            "total_credits": total_credits_found
+            "total_credits": total_credits_found,
+            "breakdown": breakdown
         })
 
     except Exception as e:

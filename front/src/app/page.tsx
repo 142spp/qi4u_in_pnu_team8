@@ -3,6 +3,7 @@
 import LectureList from "@/components/LectureList";
 import OptimizationPanel from "@/components/OptimizationPanel";
 import TimetableView from "@/components/TimetableView";
+import OptimizationDetails from "@/components/OptimizationDetails";
 import { useLectureStore } from "@/store/useLectureStore";
 
 export default function Home() {
@@ -53,6 +54,10 @@ export default function Home() {
             </div>
             <div className="flex-1 min-h-0">
               <TimetableView schedule={displaySchedule} />
+            </div>
+
+            <div className="shrink-0 mt-4">
+              <OptimizationDetails />
             </div>
           </div>
         </main>

@@ -2,5 +2,6 @@ fastapi
 uvicorn
 pandas
 dimod
+dwave-neal
 pydantic
 python-multipart

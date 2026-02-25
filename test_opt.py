@@ -23,7 +23,7 @@ try:
     
     payload = {
         "selected_lecture_ids": valid_ids,
-        "max_credits": 21.0,
+        "target_credits": 21.0,
         "prefer_contiguous": True,
         "prefer_free_days": False
     }

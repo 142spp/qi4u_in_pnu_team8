@@ -6,14 +6,15 @@ try:
 except ImportError:
     pass
 
-def build_timetable_bqm(lectures, preferences):
+def build_timetable_bqm(lectures, preferences, progress_callback=None):
     """
     Builds the Binary Quadratic Model (BQM) for timetable optimization based on Hard and Soft constraints.
+    Optimized to O(N_day^2) by grouping by day.
     """
     bqm = dimod.BinaryQuadraticModel('BINARY')
     
     # Extract preferences
-    max_credits = preferences.get("max_credits", 21.0)
+    target_credits = preferences.get("target_credits", 21.0)
     mandatory_ids = preferences.get("mandatory_ids", [])
     
     N = len(lectures)
@@ -21,21 +22,21 @@ def build_timetable_bqm(lectures, preferences):
     # -------------------------------------------------------------------------
     # 0. Base Weights / Penalties Definitions
     # -------------------------------------------------------------------------
-    W_HARD_OVERLAP = 10000.0
-    W_TARGET_CREDIT = 10.0
-    W_MANDATORY = -10000.0  # Encourage mandatory classes
+    W_HARD_OVERLAP = preferences.get("w_hard_overlap", 10000.0)
+    W_TARGET_CREDIT = preferences.get("w_target_credit", 10.0)
+    W_MANDATORY = preferences.get("w_mandatory", -10000.0)
     
     # Soft constraints - Linear
-    W_FIRST_CLASS = 50.0   # Penalty for 1st period (e.g. 9:00 started classes)
-    W_LUNCH_OVERLAP = 30.0 # Penalty for eating during 12:00-13:00
+    W_FIRST_CLASS = preferences.get("w_first_class", 50.0)
+    W_LUNCH_OVERLAP = preferences.get("w_lunch_overlap", 30.0)
     
     # Soft constraints - Free Days
-    R_FREE_DAY = 100.0     # Reward for having a free day
-    P_FREE_DAY_BREAK = 500.0 # Penalty if a class is on a declared free day
+    R_FREE_DAY = preferences.get("r_free_day", 100.0)
+    P_FREE_DAY_BREAK = preferences.get("p_free_day_break", 500.0)
     
     # Soft constraints - Tension Model
-    W_CONTIGUOUS_REWARD = -20.0  # Reward for gap <= 60 minutes
-    W_TENSION_BASE = 5.0         # Base penalty for tension (gap > 60 and gap <= 180)
+    W_CONTIGUOUS_REWARD = preferences.get("w_contiguous_reward", -20.0)
+    W_TENSION_BASE = preferences.get("w_tension_base", 5.0)
     
     linear_biases = {}
     quadratic_biases = {}
@@ -44,82 +45,114 @@ def build_timetable_bqm(lectures, preferences):
         linear_biases[var] = linear_biases.get(var, 0.0) + bias
         
     def add_quadratic(u, v, bias):
-        # normalize order to prevent directed edges creating duplicated entries
         if str(u) > str(v): 
             u, v = v, u
         quadratic_biases[(u, v)] = quadratic_biases.get((u, v), 0.0) + bias
 
     # -------------------------------------------------------------------------
-    # 1. Variables Definition & Linear Biases (Soft Constraints 1 & Mandatory)
+    # 1. Linear Biases & Day Grouping
     # -------------------------------------------------------------------------
+    if progress_callback:
+        progress_callback("Analyzing lectures and linear biases...", 10)
+
+    # Group lectures by day for O(N_day^2) quadratic checks
+    lectures_by_day = {d: [] for d in ['월', '화', '수', '목', '금', '토', '일']}
+    
     for i in range(N):
         lec_i = lectures[i]
         id_i = lec_i["id"]
         c_i = lec_i["credit"]
         
-        # Target Credit Linear Term: A * (c_i^2 - 2 * K * c_i)
-        add_linear(id_i, W_TARGET_CREDIT * (c_i**2 - 2 * max_credits * c_i))
+        # Target Credit Linear Term
+        add_linear(id_i, W_TARGET_CREDIT * (c_i**2 - 2 * target_credits * c_i))
         
         # Mandatory Requirement
         if id_i in mandatory_ids:
             add_linear(id_i, W_MANDATORY)
             
-        # 1st Period & Lunch Time Penalty
         parsed_times = lec_i.get("parsed_time", [])
         for pt in parsed_times:
-            # 1st period (starts before or equal to 9:30 AM = 9*60+30 = 570 minutes)
+            day = pt['day']
+            if day in lectures_by_day:
+                lectures_by_day[day].append(lec_i)
+            
+            # 1st period penalty
             if pt['start'] <= 570:
                 add_linear(id_i, W_FIRST_CLASS)
-            # Lunch time (12:00 - 13:00 => 720 - 780 minutes)
+            # Lunch time penalty
             if max(pt['start'], 720) < min(pt['end'], 780):
                 add_linear(id_i, W_LUNCH_OVERLAP)
 
-        # Target Credit Quadratic Term: A * (2 * c_i * c_j)
+    # -------------------------------------------------------------------------
+    # 2. Quadratic Biases (Target Credits - Global pairs)
+    # -------------------------------------------------------------------------
+    # Note: Target credit cross-terms apply to ALL pairs. This is still O(N^2).
+    # To optimize this further if N=4000, we might need to skip extremely low impact pairs,
+    # but for now let's focus on the most expensive parts (overlaps/gaps).
+    if progress_callback:
+        progress_callback("Calculating credit interaction terms...", 30)
+
+    for i in range(N):
+        id_i = lectures[i]["id"]
+        c_i = lectures[i]["credit"]
         for j in range(i + 1, N):
             id_j = lectures[j]["id"]
             c_j = lectures[j]["credit"]
+
+            if id_i == id_j:
+                continue
+                
             add_quadratic(id_i, id_j, W_TARGET_CREDIT * (2 * c_i * c_j))
-            
-    # -------------------------------------------------------------------------
-    # 2. Hard Constraints (Time Overlap)
-    # -------------------------------------------------------------------------
-    for i in range(N):
-        for j in range(i + 1, N):
-            if check_overlap(lectures[i]["parsed_time"], lectures[j]["parsed_time"]):
-                add_quadratic(lectures[i]["id"], lectures[j]["id"], W_HARD_OVERLAP)
 
     # -------------------------------------------------------------------------
-    # 3. Soft Constraints 2: Free Days (Auxiliary Variables)
+    # 3. Hard Constraints & Tension Model (Optimized by Day Grouping)
     # -------------------------------------------------------------------------
-    days = ['월', '화', '수', '목', '금']
-    for d in days:
-        y_d = f"free_{d}"
-        add_linear(y_d, -R_FREE_DAY) # Base reward for claiming free day
+    if progress_callback:
+        progress_callback("Checking time overlaps and tension models...", 60)
+
+    days = ['월', '화', '수', '목', '금', '토', '일']
+    for day_idx, d in enumerate(days):
+        day_lectures = lectures_by_day[d]
+        num_day_lecs = len(day_lectures)
         
-        for i in range(N):
-            id_i = lectures[i]['id']
-            on_day_d = any(pt['day'] == d for pt in lectures[i].get('parsed_time', []))
-            if on_day_d:
-                # Strong penalty if class is on 'claimed' free day
-                add_quadratic(id_i, y_d, P_FREE_DAY_BREAK)
-
-    # -------------------------------------------------------------------------
-    # 4. Soft Constraints 3: Tension Model (Quadratic Biases)
-    # -------------------------------------------------------------------------
-    for i in range(N):
-        for j in range(i + 1, N):
-            gap = calculate_time_gap(lectures[i]["parsed_time"], lectures[j]["parsed_time"])
-            if gap > 0:
-                if gap <= 60:
-                    # Clustering reward for contiguous classes
-                    add_quadratic(lectures[i]["id"], lectures[j]["id"], W_CONTIGUOUS_REWARD)
-                elif gap <= 180:
-                    # Tension penalty for awkward gaps using sqrt to prevent runaway explosion
-                    penalty = W_TENSION_BASE * math.sqrt(gap)
-                    add_quadratic(lectures[i]["id"], lectures[j]["id"], penalty)
+        # Free Day Auxiliary Logic
+        y_d = f"free_{d}"
+        if num_day_lecs > 0: # Only bother if classes exist on this day
+            add_linear(y_d, -R_FREE_DAY)
+        
+        for i in range(num_day_lecs):
+            lec_i = day_lectures[i]
+            id_i = lec_i['id']
+            
+            # Link to free day variable
+            add_quadratic(id_i, y_d, P_FREE_DAY_BREAK)
+            
+            # Day-specific quadratic interactions
+            for j in range(i + 1, num_day_lecs):
+                lec_j = day_lectures[j]
+                id_j = lec_j['id']
+                
+                # IMPORTANT: dimod does not allow self-interactions (u == v).
+                # If a lecture has multiple periods on the same day, skip comparing it with itself.
+                if id_i == id_j:
+                    continue
+                
+                # check_overlap and calculate_time_gap are faster here
+                if check_overlap(lec_i["parsed_time"], lec_j["parsed_time"]):
+                    add_quadratic(id_i, id_j, W_HARD_OVERLAP)
                 else:
-                    # gap > 180: Counted as separate groups, 0 quadratic interaction
-                    pass
+                    gap = calculate_time_gap(lec_i["parsed_time"], lec_j["parsed_time"])
+                    if 0 < gap <= 60:
+                        add_quadratic(id_i, id_j, W_CONTIGUOUS_REWARD)
+                    elif 60 < gap <= 180:
+                        penalty = W_TENSION_BASE * math.sqrt(gap)
+                        add_quadratic(id_i, id_j, penalty)
+        
+        if progress_callback:
+            progress_callback(f"Analyzing day {d} ({day_idx+1}/7)...", 60 + int((day_idx+1)/7 * 30))
+
+    if progress_callback:
+        progress_callback("Finalizing BQM...", 95)
 
     # Apply all accumulated biases
     for var, bias in linear_biases.items():
@@ -129,3 +162,4 @@ def build_timetable_bqm(lectures, preferences):
         bqm.add_interaction(u, v, bias)
                     
     return bqm
+
