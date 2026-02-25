@@ -73,17 +73,6 @@ export default function LectureList() {
                         className="flex-1 outline-none bg-transparent text-sm text-foreground"
                     />
                 </div>
-                <div className="flex items-center space-x-2 border rounded-md px-3 py-2 bg-white w-32 shrink-0">
-                    <label className="text-xs text-muted-foreground whitespace-nowrap">credit</label>
-                    <input
-                        type="number"
-                        min="1"
-                        max="24"
-                        value={targetCredits}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTargetCredits(parseInt(e.target.value) || 0)}
-                        className="flex-1 outline-none bg-transparent text-sm text-foreground font-semibold text-right"
-                    />
-                </div>
             </div>
             <ScrollArea className="flex-1 border-t overflow-y-auto min-h-0">
                 <div className="flex flex-col divide-y divide-gray-100">

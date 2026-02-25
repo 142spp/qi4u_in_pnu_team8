@@ -147,7 +147,7 @@ export default function OptimizationPanel() {
                         <h4 className="text-xs font-bold uppercase tracking-wider text-orange-500 border-b pb-1">Penalty Weights (+)</h4>
                         <div className="grid grid-cols-2 gap-3">
                             {renderInput("Hard Overlap Eval", "w_hard_overlap", "1000")}
-                            {renderInput("Credits Variance", "w_target_credit", "1")}
+                            {renderInput("Credits Variance", "w_target_credit", "10")}
                             {renderInput("1st Period Cost", "w_first_class", "5")}
                             {renderInput("Lunch Overlap", "w_lunch_overlap", "5")}
                             {renderInput("Free Day Break", "p_free_day_break", "10")}

@@ -93,96 +93,120 @@ def optimize_timetable(task_id: str, preferences: dict):
         # Concatenate all results
         sampleset = dimod.concatenate(all_samplesets)
         
-        # 4. Parse Results
-        best_sample = sampleset.first.sample
-        energy = sampleset.first.energy
+        # 4. Parse Top 5 Unique Results
+        # sampleset is ordered from lowest energy to highest
+        top_schedules = []
+        seen_combinations = set()
         
-        final_schedule = []
-        # Exclude auxiliary variables such as y_d (free_월, free_화...)
-        for var_name, is_selected in best_sample.items():
-            if is_selected == 1 and not str(var_name).startswith("free_"):
-                lec = get_lecture_by_id(var_name)
-                if lec:
-                    lec_dict = lec.copy()
-                    lec_dict['parsed_time'] = parse_time_to_range(lec['time_room'])
-                    final_schedule.append(lec_dict)
-
-        # Basic Check: Calculate total credits for logging
-        total_credits_found = sum(lec['credit'] for lec in final_schedule)
-        
-        # Breakdown Energy calculations manually for logging / ui
-        breakdown = {
-            "credit_penalty": 0.0,
-            "1st_period_penalty": 0.0,
-            "lunch_overlap_penalty": 0.0,
-            "free_day_reward": 0.0,
-            "overlap_penalty": 0.0,
-            "contiguous_reward": 0.0,
-            "tension_penalty": 0.0,
-            "mandatory_reward": 0.0,
-        }
-        
-        # Recalculate based on preferences weights
-        T_CREDIT = preferences.get("target_credits", 21.0)
-        W_CREDIT = preferences.get("w_target_credit", 10.0)
-        W_FIRST = preferences.get("w_first_class", 50.0)
-        W_LUNCH = preferences.get("w_lunch_overlap", 30.0)
-        R_FREE = preferences.get("r_free_day", 100.0)
-        P_FREE_BREAK = preferences.get("p_free_day_break", 500.0)
-        W_OVERLAP = preferences.get("w_hard_overlap", 10000.0)
-        W_CONTIG = preferences.get("w_contiguous_reward", -20.0)
-        W_TENSION = preferences.get("w_tension_base", 5.0)
-        W_MAN = preferences.get("w_mandatory", -10000.0)
-        
-        breakdown["credit_penalty"] = round(W_CREDIT * (total_credits_found - T_CREDIT)**2, 2)
-        
-        days_with_classes = set()
-        for lec in final_schedule:
-            if lec["id"] in selected_ids:
-                breakdown["mandatory_reward"] += W_MAN
-            
-            for pt in lec.get('parsed_time', []):
-                days_with_classes.add(pt['day'])
-                if pt['start'] <= 570:
-                    breakdown["1st_period_penalty"] += W_FIRST
-                if max(pt['start'], 720) < min(pt['end'], 780):
-                    breakdown["lunch_overlap_penalty"] += W_LUNCH
-                    
-        # Free day logical reward
-        for d in ['월', '화', '수', '목', '금', '토', '일']:
-            if f"free_{d}" in best_sample and best_sample[f"free_{d}"] == 1:
-                breakdown["free_day_reward"] += -R_FREE
-                if d in days_with_classes:
-                    breakdown["free_day_reward"] += P_FREE_BREAK
-
-        # Pairwise penalties
-        for i in range(len(final_schedule)):
-            for j in range(i+1, len(final_schedule)):
-                lec_i = final_schedule[i]
-                lec_j = final_schedule[j]
+        for sample, energy in sampleset.data(['sample', 'energy']):
+            if len(top_schedules) >= 5:
+                break
                 
-                # Assume check_overlap handles parsed times list
-                for pt_i in lec_i.get('parsed_time', []):
-                    for pt_j in lec_j.get('parsed_time', []):
-                        if pt_i['day'] == pt_j['day']: # Same day only
-                            from ..utils.time_utils import check_overlap, calculate_time_gap
-                            if check_overlap([pt_i], [pt_j]):
-                                breakdown["overlap_penalty"] += W_OVERLAP
-                            else:
-                                gap = calculate_time_gap([pt_i], [pt_j])
-                                if 0 < gap <= 60:
-                                    breakdown["contiguous_reward"] += W_CONTIG
-                                elif 60 < gap <= 180:
-                                    breakdown["tension_penalty"] += round(W_TENSION * math.sqrt(gap), 2)
+            current_schedule = []
+            current_ids = []
+            
+            # Exclude auxiliary variables such as y_d (free_월, free_화...)
+            for var_name, is_selected in sample.items():
+                if is_selected == 1 and not str(var_name).startswith("free_"):
+                    lec = get_lecture_by_id(var_name)
+                    if lec:
+                        lec_dict = lec.copy()
+                        lec_dict['parsed_time'] = parse_time_to_range(lec['time_room'])
+                        current_schedule.append(lec_dict)
+                        current_ids.append(lec['id'])
+            
+            # Create a unique signature for this schedule combination
+            combo_sig = frozenset(current_ids)
+            if combo_sig not in seen_combinations and len(current_schedule) > 0:
+                seen_combinations.add(combo_sig)
+                
+                # Basic Check: Calculate total credits for logging
+                total_credits_found = sum(lec['credit'] for lec in current_schedule)
+                
+                # Manual Breakdown Energy calculation
+                breakdown = {
+                    "credit_penalty": 0.0,
+                    "1st_period_penalty": 0.0,
+                    "lunch_overlap_penalty": 0.0,
+                    "free_day_reward": 0.0,
+                    "overlap_penalty": 0.0,
+                    "contiguous_reward": 0.0,
+                    "tension_penalty": 0.0,
+                    "mandatory_reward": 0.0,
+                }
+                
+                # Recalculate based on preferences weights
+                T_CREDIT = preferences.get("target_credits", 21.0)
+                W_CREDIT = preferences.get("w_target_credit", 10.0)
+                W_FIRST = preferences.get("w_first_class", 50.0)
+                W_LUNCH = preferences.get("w_lunch_overlap", 30.0)
+                R_FREE = preferences.get("r_free_day", 100.0)
+                P_FREE_BREAK = preferences.get("p_free_day_break", 500.0)
+                W_OVERLAP = preferences.get("w_hard_overlap", 10000.0)
+                W_CONTIG = preferences.get("w_contiguous_reward", -20.0)
+                W_TENSION = preferences.get("w_tension_base", 5.0)
+                W_MAN = preferences.get("w_mandatory", -10000.0)
+                
+                breakdown["credit_penalty"] = round(W_CREDIT * (total_credits_found - T_CREDIT)**2, 2)
+                
+                days_with_classes = set()
+                for lec in current_schedule:
+                    if lec["id"] in selected_ids:
+                        breakdown["mandatory_reward"] += W_MAN
+                    
+                    for pt in lec.get('parsed_time', []):
+                        days_with_classes.add(pt['day'])
+                        if pt['start'] <= 570:
+                            breakdown["1st_period_penalty"] += W_FIRST
+                        if max(pt['start'], 720) < min(pt['end'], 780):
+                            breakdown["lunch_overlap_penalty"] += W_LUNCH
+                            
+                # Free day logical reward
+                for d in ['월', '화', '수', '목', '금', '토', '일']:
+                    if f"free_{d}" in sample and sample[f"free_{d}"] == 1:
+                        breakdown["free_day_reward"] += -R_FREE
+                        if d in days_with_classes:
+                            breakdown["free_day_reward"] += P_FREE_BREAK
 
-        print(f"Task {task_id}: Optimization complete. Selected {len(final_schedule)} lectures ({total_credits_found} credits). Energy: {energy}")
+                # Pairwise penalties
+                for i in range(len(current_schedule)):
+                    for j in range(i+1, len(current_schedule)):
+                        lec_i = current_schedule[i]
+                        lec_j = current_schedule[j]
+                        
+                        for pt_i in lec_i.get('parsed_time', []):
+                            for pt_j in lec_j.get('parsed_time', []):
+                                if pt_i['day'] == pt_j['day']: # Same day only
+                                    from ..utils.time_utils import check_overlap, calculate_time_gap
+                                    if check_overlap([pt_i], [pt_j]):
+                                        breakdown["overlap_penalty"] += W_OVERLAP
+                                    else:
+                                        gap = calculate_time_gap([pt_i], [pt_j])
+                                        if 0 < gap <= 60:
+                                            breakdown["contiguous_reward"] += W_CONTIG
+                                        elif 60 < gap <= 180:
+                                            breakdown["tension_penalty"] += round(W_TENSION * math.sqrt(gap), 2)
+                
+                top_schedules.append({
+                    "schedule": current_schedule,
+                    "energy": energy,
+                    "total_credits": total_credits_found,
+                    "breakdown": breakdown
+                })
+
+        if not top_schedules:
+            raise ValueError("No valid schedules could be generated.")
+            
+        best_result = top_schedules[0]
+        print(f"Task {task_id}: Optimization complete. Found {len(top_schedules)} unique schedules. Best Energy: {best_result['energy']}")
         
-        # Update status
+        # Update status with Top 5
         update_task_status(task_id, "SUCCESS", result={
-            "schedule": final_schedule,
-            "energy": energy,
-            "total_credits": total_credits_found,
-            "breakdown": breakdown
+            "schedule": best_result["schedule"], # Keep for backward compatibility
+            "energy": best_result["energy"],
+            "total_credits": best_result["total_credits"],
+            "breakdown": best_result["breakdown"],
+            "top_schedules": top_schedules
         })
 
     except Exception as e:
