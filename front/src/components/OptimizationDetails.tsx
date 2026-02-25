@@ -2,14 +2,15 @@
 
 import { useLectureStore } from "@/store/useLectureStore";
 
-export default function OptimizationDetails() {
-    const { optimizationResult } = useLectureStore();
+export default function OptimizationDetails({ result }: { result?: any }) {
+    const storeResult = useLectureStore(state => state.optimizationResult);
+    const activeResult = result || storeResult;
 
-    if (!optimizationResult || !optimizationResult.breakdown) {
+    if (!activeResult || !activeResult.breakdown) {
         return null;
     }
 
-    const { energy, total_credits, breakdown } = optimizationResult;
+    const { energy, total_credits, breakdown } = activeResult;
 
     return (
         <div className="mt-6 border rounded-xl overflow-hidden shadow-sm bg-white">
@@ -17,10 +18,10 @@ export default function OptimizationDetails() {
                 <h3 className="font-bold text-gray-900">Optimization Result Insights</h3>
                 <div className="flex space-x-4 text-sm font-semibold">
                     <span className="text-secondary-foreground text-xs bg-secondary px-2 py-1 rounded">
-                        Target Credits: {total_credits}
+                        Total Credits: {total_credits}
                     </span>
                     <span className="text-primary-foreground text-xs bg-primary px-2 py-1 rounded">
-                        Total Energy: {energy}
+                        Total Energy: {typeof energy === 'number' ? energy.toFixed(2) : energy}
                     </span>
                 </div>
             </div>
@@ -50,7 +51,7 @@ export default function OptimizationDetails() {
                                     {formatName}
                                 </span>
                                 <span className={`text-lg tracking-tight ${colorClass}`}>
-                                    {val > 0 ? '+' : ''}{val}
+                                    {val > 0 ? '+' : ''}{typeof val === 'number' ? val.toFixed(2) : val}
                                 </span>
                             </div>
                         );

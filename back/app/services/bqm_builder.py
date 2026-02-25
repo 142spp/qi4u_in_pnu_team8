@@ -23,7 +23,7 @@ def build_timetable_bqm(lectures, preferences, progress_callback=None):
     # 0. Base Weights / Penalties Definitions
     # -------------------------------------------------------------------------
     W_HARD_OVERLAP = preferences.get("w_hard_overlap", 10000.0)
-    W_TARGET_CREDIT = preferences.get("w_target_credit", 10.0)
+    W_TARGET_CREDIT = preferences.get("w_target_credit", 100.0)
     W_MANDATORY = preferences.get("w_mandatory", -10000.0)
     
     # Soft constraints - Linear
@@ -37,6 +37,9 @@ def build_timetable_bqm(lectures, preferences, progress_callback=None):
     # Soft constraints - Tension Model
     W_CONTIGUOUS_REWARD = preferences.get("w_contiguous_reward", -20.0)
     W_TENSION_BASE = preferences.get("w_tension_base", 5.0)
+    
+    # Soft constraints - Time/Credit Mismatch
+    W_TIME_CREDIT_RATIO = preferences.get("w_time_credit_ratio", 50.0)
     
     linear_biases = {}
     quadratic_biases = {}
@@ -71,10 +74,15 @@ def build_timetable_bqm(lectures, preferences, progress_callback=None):
             add_linear(id_i, W_MANDATORY)
             
         parsed_times = lec_i.get("parsed_time", [])
+        total_duration_minutes = 0
+        
         for pt in parsed_times:
             day = pt['day']
             if day in lectures_by_day:
                 lectures_by_day[day].append(lec_i)
+            
+            # Duration Calculation
+            total_duration_minutes += (pt['end'] - pt['start'])
             
             # 1st period penalty
             if pt['start'] <= 570:
@@ -82,6 +90,11 @@ def build_timetable_bqm(lectures, preferences, progress_callback=None):
             # Lunch time penalty
             if max(pt['start'], 720) < min(pt['end'], 780):
                 add_linear(id_i, W_LUNCH_OVERLAP)
+
+        # Time/Credit Mismatch Penalty
+        duration_hours = total_duration_minutes / 60.0
+        if duration_hours > c_i:
+            add_linear(id_i, W_TIME_CREDIT_RATIO * (duration_hours - c_i))
 
     # -------------------------------------------------------------------------
     # 2. Quadratic Biases (Target Credits - Global pairs)

@@ -133,11 +133,12 @@ def optimize_timetable(task_id: str, preferences: dict):
                     "contiguous_reward": 0.0,
                     "tension_penalty": 0.0,
                     "mandatory_reward": 0.0,
+                    "time_credit_mismatch_penalty": 0.0,
                 }
                 
                 # Recalculate based on preferences weights
                 T_CREDIT = preferences.get("target_credits", 21.0)
-                W_CREDIT = preferences.get("w_target_credit", 10.0)
+                W_CREDIT = preferences.get("w_target_credit", 100.0)
                 W_FIRST = preferences.get("w_first_class", 50.0)
                 W_LUNCH = preferences.get("w_lunch_overlap", 30.0)
                 R_FREE = preferences.get("r_free_day", 100.0)
@@ -146,6 +147,7 @@ def optimize_timetable(task_id: str, preferences: dict):
                 W_CONTIG = preferences.get("w_contiguous_reward", -20.0)
                 W_TENSION = preferences.get("w_tension_base", 5.0)
                 W_MAN = preferences.get("w_mandatory", -10000.0)
+                W_TIME_CREDIT = preferences.get("w_time_credit_ratio", 50.0)
                 
                 breakdown["credit_penalty"] = round(W_CREDIT * (total_credits_found - T_CREDIT)**2, 2)
                 
@@ -154,12 +156,18 @@ def optimize_timetable(task_id: str, preferences: dict):
                     if lec["id"] in selected_ids:
                         breakdown["mandatory_reward"] += W_MAN
                     
+                    total_duration_minutes = 0
                     for pt in lec.get('parsed_time', []):
                         days_with_classes.add(pt['day'])
+                        total_duration_minutes += (pt['end'] - pt['start'])
                         if pt['start'] <= 570:
                             breakdown["1st_period_penalty"] += W_FIRST
                         if max(pt['start'], 720) < min(pt['end'], 780):
                             breakdown["lunch_overlap_penalty"] += W_LUNCH
+                            
+                    duration_hours = total_duration_minutes / 60.0
+                    if duration_hours > lec['credit']:
+                        breakdown["time_credit_mismatch_penalty"] += round(W_TIME_CREDIT * (duration_hours - lec['credit']), 2)
                             
                 # Free day logical reward
                 for d in ['월', '화', '수', '목', '금', '토', '일']:

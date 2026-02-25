@@ -22,14 +22,15 @@ export default function OptimizationPanel() {
         total_reads: 100,
         batch_size: 100,
         w_hard_overlap: 10000.0,
-        w_target_credit: 10.0,
+        w_target_credit: 100.0,
         w_mandatory: -10000.0,
         w_first_class: 50.0,
         w_lunch_overlap: 30.0,
         r_free_day: 100.0,
         p_free_day_break: 500.0,
         w_contiguous_reward: -20.0,
-        w_tension_base: 5.0
+        w_tension_base: 5.0,
+        w_time_credit_ratio: 50.0
     });
 
     const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,11 +148,12 @@ export default function OptimizationPanel() {
                         <h4 className="text-xs font-bold uppercase tracking-wider text-orange-500 border-b pb-1">Penalty Weights (+)</h4>
                         <div className="grid grid-cols-2 gap-3">
                             {renderInput("Hard Overlap Eval", "w_hard_overlap", "1000")}
-                            {renderInput("Credits Variance", "w_target_credit", "10")}
+                            {renderInput("Credits Variance", "w_target_credit", "100")}
                             {renderInput("1st Period Cost", "w_first_class", "5")}
                             {renderInput("Lunch Overlap", "w_lunch_overlap", "5")}
                             {renderInput("Free Day Break", "p_free_day_break", "10")}
                             {renderInput("Tension Base Eq.", "w_tension_base", "1")}
+                            {renderInput("Credit/Time Mismatch", "w_time_credit_ratio", "10")}
                         </div>
                     </div>
 
