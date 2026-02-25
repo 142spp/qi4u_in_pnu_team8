@@ -61,7 +61,7 @@ export default function TimetableCardsRow() {
             </div>
 
             <Dialog open={!!selectedSchedule} onOpenChange={(open) => !open && setSelectedSchedule(null)}>
-                <DialogContent className="max-w-[95vw] lg:max-w-[1200px] w-full h-[90vh] flex flex-col p-6 gap-0">
+                <DialogContent className="max-w-[95vw] lg:max-w-[1000px] w-full h-[90vh] flex flex-col p-6 gap-0">
                     <DialogHeader className="mb-4 shrink-0">
                         <DialogTitle className="text-2xl font-bold flex items-center gap-3">
                             Detailed Schedule View
@@ -75,14 +75,14 @@ export default function TimetableCardsRow() {
                     </DialogHeader>
 
                     {selectedSchedule && (
-                        <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6 overflow-hidden">
-                            {/* Left: Timetable */}
-                            <div className="flex-1 h-full min-h-0">
-                                <TimetableView schedule={selectedSchedule.schedule} readonly />
+                        <div className="flex-1 overflow-y-auto pr-2 flex flex-col gap-6 pb-6">
+                            {/* Top: Timetable */}
+                            <div className="w-full shrink-0">
+                                <TimetableView schedule={selectedSchedule.schedule} />
                             </div>
 
-                            {/* Right: Details Panel */}
-                            <div className="w-full lg:w-[450px] shrink-0 overflow-y-auto pr-2">
+                            {/* Bottom: Details Panel */}
+                            <div className="w-full shrink-0">
                                 <OptimizationDetails result={selectedSchedule} />
                             </div>
                         </div>
