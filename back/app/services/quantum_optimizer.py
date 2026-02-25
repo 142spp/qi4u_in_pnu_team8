@@ -40,7 +40,9 @@ def optimize_timetable(task_id: str, preferences: dict):
             if lec["id"] in selected_ids:
                 mandatory_pool.append(lec)
             else:
-                candidate_pool.append(lec)
+                # Exclude Saturday classes from candidates
+                if "토" not in (lec.get("time_room") or ""):
+                    candidate_pool.append(lec)
         
         # Shuffle candidates for variety
         random.shuffle(candidate_pool)
@@ -133,7 +135,7 @@ def optimize_timetable(task_id: str, preferences: dict):
                     "contiguous_reward": 0.0,
                     "tension_penalty": 0.0,
                     "mandatory_reward": 0.0,
-                    "time_credit_mismatch_penalty": 0.0,
+                    "credit/time_mismatch_penalty": 0.0,
                 }
                 
                 # Recalculate based on preferences weights
@@ -167,7 +169,7 @@ def optimize_timetable(task_id: str, preferences: dict):
                             
                     duration_hours = total_duration_minutes / 60.0
                     if duration_hours > lec['credit']:
-                        breakdown["time_credit_mismatch_penalty"] += round(W_TIME_CREDIT * (duration_hours - lec['credit']), 2)
+                        breakdown["credit/time_mismatch_penalty"] += round(W_TIME_CREDIT * (duration_hours - lec['credit']), 2)
                             
                 # Free day logical reward
                 for d in ['월', '화', '수', '목', '금', '토', '일']:
@@ -195,11 +197,17 @@ def optimize_timetable(task_id: str, preferences: dict):
                                         elif 60 < gap <= 180:
                                             breakdown["tension_penalty"] += round(W_TENSION * math.sqrt(gap), 2)
                 
+                if "overlap_penalty" in breakdown:
+                    del breakdown["overlap_penalty"]
+
+                true_energy = sum(breakdown.values())
+
                 top_schedules.append({
                     "schedule": current_schedule,
-                    "energy": energy,
+                    "energy": true_energy,
                     "total_credits": total_credits_found,
-                    "breakdown": breakdown
+                    "breakdown": breakdown,
+                    "raw_bqm_energy": energy
                 })
 
         if not top_schedules:

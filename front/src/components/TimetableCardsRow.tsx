@@ -78,7 +78,7 @@ export default function TimetableCardsRow() {
                         <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6 overflow-hidden">
                             {/* Left: Timetable */}
                             <div className="flex-1 h-full min-h-0">
-                                <TimetableView schedule={selectedSchedule.schedule} />
+                                <TimetableView schedule={selectedSchedule.schedule} readonly />
                             </div>
 
                             {/* Right: Details Panel */}

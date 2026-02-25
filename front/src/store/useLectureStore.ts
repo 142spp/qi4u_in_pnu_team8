@@ -58,6 +58,10 @@ export const useLectureStore = create<LectureState>((set) => ({
         }
     }),
     clearSelection: () => set({ selectedIds: [], optimizedSchedule: null, optimizationResult: null }),
-    setOptimizedSchedule: (schedule, result = null) => set({ optimizedSchedule: schedule, optimizationResult: result }),
+    setOptimizedSchedule: (schedule, result = null) => set((state: LectureState) => ({
+        optimizedSchedule: schedule,
+        optimizationResult: result,
+        selectedIds: schedule ? schedule.map((l: Lecture) => l.id) : state.selectedIds
+    })),
     setTargetCredits: (credits) => set({ targetCredits: credits })
 }));

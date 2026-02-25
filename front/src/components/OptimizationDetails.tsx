@@ -12,6 +12,8 @@ export default function OptimizationDetails({ result }: { result?: any }) {
 
     const { energy, total_credits, breakdown } = activeResult;
 
+    console.log(breakdown)
+
     return (
         <div className="mt-6 border rounded-xl overflow-hidden shadow-sm bg-white">
             <div className="bg-muted px-4 py-3 border-b flex justify-between items-center">

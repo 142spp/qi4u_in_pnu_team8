@@ -1,11 +1,13 @@
 "use client";
 
-import { Lecture } from "@/store/useLectureStore";
+import { useLectureStore, Lecture } from "@/store/useLectureStore";
 import { parseTimeRoom } from "@/lib/timeParser";
-import { useMemo } from "react";
+import React, { useMemo } from "react";
+import { X } from "lucide-react";
 
 interface TimetableViewProps {
     schedule: Lecture[];
+    readonly?: boolean;
 }
 
 const DAYS = ["월", "화", "수", "목", "금"];
@@ -33,7 +35,8 @@ const getBgColor = (index: number) => {
     return colors[index % colors.length];
 };
 
-export default function TimetableView({ schedule }: TimetableViewProps) {
+export default function TimetableView({ schedule, readonly = false }: TimetableViewProps) {
+    const { toggleSelection } = useLectureStore();
     // Parse all lectures into renderable blocks
     const renderedBlocks = useMemo(() => {
         const blocks: any[] = [];
@@ -97,7 +100,7 @@ export default function TimetableView({ schedule }: TimetableViewProps) {
                         {renderedBlocks.map((block) => (
                             <div
                                 key={block.id}
-                                className={`absolute left-0 right-0 mx-1 p-1.5 rounded text-xs border overflow-hidden leading-tight ${getBgColor(block.lectureIndex)}`}
+                                className={`absolute left-0 right-0 mx-1 p-1.5 rounded text-xs border overflow-hidden leading-tight group ${getBgColor(block.lectureIndex)}`}
                                 style={{
                                     top: block.top,
                                     height: block.height - 2,
@@ -107,7 +110,19 @@ export default function TimetableView({ schedule }: TimetableViewProps) {
                                 }}
                                 title={`${block.lecture.name} (${block.lecture.credit}학점)\n${block.lecture.professor}\n${block.lecture.time_room}`}
                             >
-                                <div className="font-bold truncate">{block.lecture.name} <span className="font-normal text-[10px]">({block.lecture.credit}학점)</span></div>
+                                {!readonly && (
+                                    <button
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.stopPropagation();
+                                            toggleSelection(block.lecture.id);
+                                        }}
+                                        className="absolute top-1 right-1 p-0.5 rounded-full bg-black/10 hover:bg-black/20 text-black/60 hover:text-black opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="강의 제외"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                )}
+                                <div className={`font-bold truncate ${!readonly ? 'pr-4' : ''}`}>{block.lecture.name} <span className="font-normal text-[10px]">({block.lecture.credit}학점)</span></div>
                                 <div className="text-[10px] truncate opacity-80">{block.lecture.professor}</div>
                                 <div className="text-[10px] truncate opacity-60">
                                     {Math.floor(block.top / HOUR_HEIGHT) + START_HOUR}:{Math.floor((block.top % HOUR_HEIGHT) / HOUR_HEIGHT * 60).toString().padStart(2, '0')} -
