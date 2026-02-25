@@ -103,7 +103,9 @@ def optimize_timetable(task_id: str, preferences: dict):
             if is_selected == 1 and not str(var_name).startswith("free_"):
                 lec = get_lecture_by_id(var_name)
                 if lec:
-                    final_schedule.append(lec)
+                    lec_dict = lec.copy()
+                    lec_dict['parsed_time'] = parse_time_to_range(lec['time_room'])
+                    final_schedule.append(lec_dict)
 
         # Basic Check: Calculate total credits for logging
         total_credits_found = sum(lec['credit'] for lec in final_schedule)

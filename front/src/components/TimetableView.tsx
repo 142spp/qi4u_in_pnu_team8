@@ -39,7 +39,7 @@ export default function TimetableView({ schedule }: TimetableViewProps) {
         const blocks: any[] = [];
         schedule.forEach((lec, index) => {
             const timeBlocks = parseTimeRoom(lec.time_room);
-            timeBlocks.forEach(tb => {
+            timeBlocks.forEach((tb, tbIndex) => {
                 // If it starts before 9, clamp it.
                 if (tb.startMinutes < START_HOUR * 60) return;
 
@@ -47,7 +47,7 @@ export default function TimetableView({ schedule }: TimetableViewProps) {
                 const durationHours = (tb.endMinutes - tb.startMinutes) / 60;
 
                 blocks.push({
-                    id: lec.id + tb.dayIndex,
+                    id: `${lec.id}-${tb.dayIndex}-${tbIndex}`,
                     lecture: lec,
                     lectureIndex: index,
                     dayIndex: tb.dayIndex,
@@ -105,9 +105,9 @@ export default function TimetableView({ schedule }: TimetableViewProps) {
                                     width: `calc(${100 / 5}% - 0.5rem)`,
                                     zIndex: 10
                                 }}
-                                title={`${block.lecture.name}\n${block.lecture.professor}\n${block.lecture.time_room}`}
+                                title={`${block.lecture.name} (${block.lecture.credit}학점)\n${block.lecture.professor}\n${block.lecture.time_room}`}
                             >
-                                <div className="font-bold truncate">{block.lecture.name}</div>
+                                <div className="font-bold truncate">{block.lecture.name} <span className="font-normal text-[10px]">({block.lecture.credit}학점)</span></div>
                                 <div className="text-[10px] truncate opacity-80">{block.lecture.professor}</div>
                                 <div className="text-[10px] truncate opacity-60">
                                     {Math.floor(block.top / HOUR_HEIGHT) + START_HOUR}:{Math.floor((block.top % HOUR_HEIGHT) / HOUR_HEIGHT * 60).toString().padStart(2, '0')} -
