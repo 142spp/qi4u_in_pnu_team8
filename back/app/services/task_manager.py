@@ -1,0 +1,29 @@
+import uuid
+from typing import Dict, Any
+
+# In-memory global task state storage
+global_tasks_store: Dict[str, Any] = {}
+
+def create_optimization_task(user_preferences: dict) -> str:
+    """Creates a new task ID and intializes it in the store."""
+    task_id = str(uuid.uuid4())
+    global_tasks_store[task_id] = {
+        "status": "PENDING",
+        "preferences": user_preferences,
+        "result": None,
+        "error": None
+    }
+    return task_id
+
+def update_task_status(task_id: str, status: str, result: Any = None, error: str = None):
+    """Updates the status and optional result of a task."""
+    if task_id in global_tasks_store:
+        global_tasks_store[task_id]["status"] = status
+        if result is not None:
+            global_tasks_store[task_id]["result"] = result
+        if error is not None:
+            global_tasks_store[task_id]["error"] = error
+
+def get_task_status(task_id: str) -> dict:
+    """Retrieves the full task information."""
+    return global_tasks_store.get(task_id, {"status": "NOT_FOUND"})
