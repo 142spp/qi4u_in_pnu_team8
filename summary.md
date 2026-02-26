@@ -1,35 +1,66 @@
-# 양자 컴퓨팅 기반 시간표 최적화 웹 서비스 (팀 8) - 개발 요약
+# 시간표 최적화 양자 어닐링(Simulated Annealing) 모델 요약
 
-본 문서는 현재까지 진행된 전체 시스템 구조 개선 및 프론트엔드/백엔드 UI/UX 작업 내용을 요약합니다.
-(※ 양자 어닐링 모델링 및 목적 함수(Objective Function)의 코어 로직은 다른 팀원에 의해 별도 진행 중이므로 제외됨)
+본 프로젝트는 시간표 작성 문제를 **QUBO (Quadratic Unconstrained Binary Optimization)** 모델로 정식화하고, **Simulated Annealing** (MCMC 기반의 휴리스틱 탐색 알고리즘)을 통해 최적의 시간표 조합을 탐색합니다. `dimod` 및 `neal` 라이브러리를 사용하여 파이썬 환경에서 BQM(Binary Quadratic Model)을 구성하고 해를 도출합니다.
 
----
+## 1. 변수 정의 (Variables)
 
-## 1. 아키텍처 및 백엔드 비동기 연동
-*   **비동기 Task Queue 연동**: 프론트엔드에서 `/api/optimize` 호출 시, 백엔드 최적화 코드가 FastAPI 메인 스레드를 블로킹하지 않도록 `BackgroundTasks` 방식으로 전환 
-*   **상태 폴링 (Polling)**: 클라이언트(프론트엔드)에서는 발급받은 `task_id`를 기반으로 백엔드에 지속적(1초 간격)으로 폴링하여, 연산 상태(PENDING, PROCESSING, SUCCESS, FAILURE)를 확인하도록 구현
-*   **결과 수신 구조**: 연산이 성공적으로 완료되면 백엔드의 `taskStatus.result.schedule` 데이터를 반환받아, 즉각적으로 프론트엔드의 최적화 시간표 스토어에 덮어씌움
+최적화 대상이 되는 이진 변수(Binary Variable)는 두 종류로 구성됩니다.
 
-## 2. 프론트엔드 레이아웃 및 테마 개선
-*   **2단 컴포넌트 레이아웃 분리**: 사용자의 시선 분산을 막기 위해 화면을 좌/우로 명확 분리 (`md:col-span-4` / `md:col-span-8`)
-    - **좌측 패널**: 강의 검색창, 강의 목록(스크롤 기능), 목표 학점 입력란 및 최적화 실행(Run Quantum Optimization) 버튼 배치
-    - **우측 패널**: 넓은 5일 7시간(또는 그 이상)의 달력/그리드형 메인 시간표 영역 배치
-*   **단색(무채색) 기반 파스텔 톤 테마 적용**: 전반적인 컴포넌트 색상을 흰색/검은색 위주의 무채색(Achromatic)으로 통일하고, 포인트 컬러(Primary)를 살구/피치톤(`FDC3A1`) 한 가지로만 제한하여 깔끔한 모던 UI 완성
+*   $x_i \in \{0, 1\}$: 과목 $i$의 선택 여부 (1: 선택, 0: 미선택)
+*   $y_d \in \{0, 1\}$: 요일 $d$의 공강(Free day) 여부 (1: 해당 요일 공강, 0: 수업 있음)
 
-## 3. 메인 시간표 (TimetableView) 그리드 구현
-*   **시간 포맷 정규식 파서 (`timeParser.ts`) 구현**: 각 강의의 다양한 시간/장소 문자열(예: `수 13:30-15:30`, `금 09:00(50)(외부)` 등)을 파싱하여 (시작 분, 종료 분, 요일 인덱스) 형태의 객체 배열로 변환하는 유틸리티 도입
-*   **절대 좌표(Absolute) 기반 블럭 달력**: 리스트형이 아닌 시간대별로 쪼개진 그리드 뷰 구현
-    - 월~금 5일치 열(Column) 구성 (08:00 ~ 20:00 까지 상하단 여유 공간 부여)
-    - 시간 파서를 이용해 각 블록의 상단 위치(top)와 길이(height) 계산 후 그리드 상에 예쁜 둥근 블럭 형태로 절대배치 진행
+## 2. 목적 함수 (Objective Function) 상세
 
-## 4. 강의 검색 시스템 (LectureList) 최적화 및 UI/UX 정리
-*   **리스트 플랫(Flat) 디자인 적용**: 4,000개가 넘는 항목이 부담스럽지 않도록, 각각의 아이템을 박스 형태가 아니라 깔끔한 분리선으로 나눠놓은 리스트 형태로 출력 변경
-*   **성능 최적화 (Debounce & 제한 렌더링)**:
-    - 사용자가 검색어를 타이핑할 때마다 DOM 리렌더링이 일어나 화면이 끊기는(Lag) 현상을 방지하고자 검색 입력 후 `300ms`의 디바운스 대기시간 도입
-    - 필터링 조건을 복잡하게 두지 않고 직관적으로 **강의명(name), 강의코드(number)** 만으로 빠르게 찾도록 단순화
-    - 최대 4,000개의 DOM 생성을 막기 위해 리스트 렌더에 `slice(0, 100)`을 적용, 최소한의 아이템만 브라우저 메모리에 올리는 가상화 대체 기법 사용
-*   **목표 학점 입력 UI 추가**: 상단에 목표 이수 학점을 조정/입력할 수 있는 `Target Credits` 입력칸 구성. 입력값은 `useLectureStore`의 상태로 저장되어 최적화 `/optimize` Payload 에 담겨 백엔드로 전송되도록 준비 완료.
+본 시간표 최적화 모델의 최종 목적 함수(에너지 $E$)는 여러 고려 변수들의 합으로 구성됩니다.
+다음과 같이 전체 에너지를 각 제약 조건의 선형 결합으로 표현합니다.
 
----
+$$E = E_{\text{target}} + E_{\text{mandatory}} + E_{\text{overlap}} + E_{\text{tension}} + E_{\text{contig}} + E_{\text{soft}} + E_{\text{free}}$$
 
-**향후 연결 지점**: 백엔드에서 `target_credits` 등의 조건을 수신하는 목적 함수가 완성되면, 본 요약의 1번 부분에 이어서 정상적으로 최적화 연동 테스트가 가능해집니다.
+에너지 값이 낮을수록 (Energy Minimum) 최적의 시간표로 간주됩니다. 여기서 $x_i, x_j, y_d \in \{0, 1\}$ 입니다.
+
+### 2.1 주요 에너지 항 (Main Energy Terms)
+
+첨부해주신 수식 형태에 맞춰 우리 프로젝트의 제약 조건들을 수학적으로 공식화하면 다음과 같습니다.
+
+*   **목표 학점 달성 ($E_{\text{target}}$):**
+    사용자가 원하는 목표 학점 $T$에 도달하도록 유도합니다. $c_i$는 과목 $i$의 학점입니다.
+    $$E_{\text{target}} = \lambda_{\text{credit}} \left(\sum_i c_i x_i - T\right)^2$$
+
+*   **필수 수강 과목 ($E_{\text{mandatory}}$):**
+    사용자가 직접 선택한 필수 과목 집합 $M$에 포함된 과목은 반드시 들어야 합니다. (선택 안 하면 페널티 부과)
+    $$E_{\text{mandatory}} = \lambda_{\text{man}} \sum_{i \in M} (1 - x_i)$$
+    *(코드상으로는 $\lambda$를 음수로 설정하여 $\lambda \sum x_i$ 보상을 주는 방식으로 동일하게 구현되어 있습니다.)*
+
+*   **시간 중복 금지 ($E_{\text{overlap}}$):**
+    시간이 겹치는 두 과목 쌍의 집합을 $O$라고 할 때, 둘 다 선택되는 것을 강력히 금지합니다.
+    $$E_{\text{overlap}} = \lambda_{\text{over}} \sum_{(i,j) \in O} x_i x_j$$
+
+*   **우주공강 기피 ($E_{\text{tension}}$):**
+    같은 요일(집합 $S$)에 배치된 두 과목 사이의 시간 간격(gap)이 60분 초과 일 때 부과되는 페널티입니다. $e_{i,j}$는 시간 간격의 제곱근($\sqrt{\text{gap}}$)으로 정의됩니다.
+    $$E_{\text{tension}} = \lambda_{\text{ten}} \sum_{(i,j) \in S} e_{i,j} x_i x_j$$
+
+*   **연강 선호 ($E_{\text{contig}}$):**
+    같은 요일(집합 $S$)에 배치된 두 과목 사이의 시간 간격이 60분 이하 일 때 주어지는 보상(음의 페널티)입니다. $f_{i,j}$는 연강 성립 여부에 따른 가중치입니다.
+    $$E_{\text{contig}} = \lambda_{\text{con}} \sum_{(i,j) \in S} f_{i,j} x_i x_j$$
+
+### 2.2 부가적인 소프트 & 공강 에너지 항 (Additional Soft & Free Day Terms)
+
+*   **개별 과목 소프트 페널티 ($E_{\text{soft}}$):**
+    1교시($P_{\text{1st}}$), 점심시간 겹침($P_{\text{lunch}}$), 시간 대비 학점 불균형($P_{\text{mis}}$) 등에 대해 각각의 상수 $\lambda$를 일차항에 부과합니다.
+    $$E_{\text{soft}} = \sum_i \left( \lambda_{\text{1st}} P_{\text{1st},i} + \lambda_{\text{lunch}} P_{\text{lunch},i} + \lambda_{\text{mis}} P_{\text{mis},i} \right) x_i$$
+
+*   **공강 요일 확보 ($E_{\text{free}}$):**
+    요일 $d$가 공강임을 나타내는 보조 변수 $y_d$를 활용합니다. $D_d$는 요일 $d$에 개설되는 모든 과목의 집합입니다. 공강에 대한 보상($\lambda_{\text{fb}}$)과 모순 발생 시의 페널티($\lambda_{\text{fp}}$, 여기서 $\lambda_{\text{fp}} \gg \lambda_{\text{fb}}$)항의 합으로 구성됩니다.
+    $$E_{\text{free}} = - \lambda_{\text{fb}} \sum_d y_d + \lambda_{\text{fp}} \sum_d \sum_{i \in D_d} x_i y_d$$
+
+## 3. 최적화 파이프라인 흐름 (Optimization Flow)
+
+1.  **후보군 축소 (`quantum_optimizer.py`):** 
+    *   성능 확보를 위해 전체 강의를 대상으로 하지 않고, 사용자가 지정한 필수 과목 + 선택 가능한 후보(토요일 제외 등의 조건 적용)를 추려 최대 약 300개의 BQM 변수 풀을 구성.
+2.  **BQM 모델 빌드 (`bqm_builder.py`):**
+    *   개별 강의의 Linear Biases(일차항 가중치)를 계산하여 모델에 추가.
+    *   목표 학점을 맞추기 위한 전역 쌍 상호작용(Quadratic Biases) 계산.
+    *   시간 복잡도 O(N^2)을 줄이기 위해 요일별로 묶어(O(N_day^2)) 시간 충돌, 연강/우주공강, 공강 여부 모델 검증 및 이차항 할당.
+3.  **Simulated Annealing 샘플링 (`quantum_optimizer.py`):**
+    *   C++ 기반의 `neal.SimulatedAnnealingSampler` 또는 파이썬 내장 `dimod.SimulatedAnnealingSampler`를 통해 배치를 나누어 모델 샘플링을 진행.
+    *   가장 낮은 에너지 상태(Energy Minimum)를 가지는 해를 찾아 조건 위배가 가장 적은 유니크한 시간표 조합 Top 5를 반환.
