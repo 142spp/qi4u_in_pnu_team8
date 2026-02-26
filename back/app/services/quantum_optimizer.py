@@ -1,6 +1,7 @@
 import re
 import math
 import random
+import concurrent.futures
 from .task_manager import update_task_status
 from ..core.loader import get_lecture_by_id, get_all_lectures
 from ..utils.time_utils import parse_time_to_range
@@ -82,13 +83,43 @@ def optimize_timetable(task_id: str, preferences: dict):
 
         if use_quantum and dwave_token and DWaveSampler is not None:
             print(f"Task {task_id}: Solving BQM using D-Wave Quantum Sampler...")
-            update_task_status(task_id, "PROCESSING", summary="Quantum Optimization in progress on QPU...")
+            update_task_status(task_id, "PROCESSING", summary="Initializing D-Wave Sampler (Connecting to QPU)...")
             
-            sampler = EmbeddingComposite(DWaveSampler(token=dwave_token))
-            
-            # For D-Wave, we generally just send all reads in one go.
-            sampleset = sampler.sample(bqm, num_reads=TOTAL_READS)
-        else:
+            try:
+                # Initialize direct sampler
+                base_sampler = DWaveSampler(token=dwave_token, solver="Advantage_system6.4")
+                print(f"Task {task_id}: D-Wave Sampler initialized. Solver: {base_sampler.solver.id}")
+                
+                update_task_status(task_id, "PROCESSING", summary=f"Connecting to QPU ({base_sampler.solver.id})...")
+                print(f"Task {task_id}: Creating EmbeddingComposite...")
+                sampler = EmbeddingComposite(base_sampler)
+                print(f"Task {task_id}: EmbeddingComposite created.")
+                
+                update_task_status(task_id, "PROCESSING", summary="Mapping problem to QPU topology (Embedding)...")
+                print(f"Task {task_id}: Starting sampling (includes embedding) with 30s timeout...")
+                
+                # The sample call is where the actual embedding and QPU access happens
+                # Wrapping in ThreadPoolExecutor to implement timeout
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(sampler.sample, bqm, num_reads=TOTAL_READS)
+                    try:
+                        sampleset = future.result(timeout=30)
+                        print(f"Task {task_id}: Sampling complete. QPU access time: {sampleset.info.get('timing', {}).get('qpu_access_time', 'N/A')} us")
+                        update_task_status(task_id, "PROCESSING", summary="Retrieving results from QPU...")
+                    except concurrent.futures.TimeoutError:
+                        print(f"Task {task_id} Error: D-Wave Optimization timed out after 30 seconds.")
+                        update_task_status(task_id, "PROCESSING", summary="D-Wave timeout (30s). Falling back to Simulated Annealing...")
+                        use_quantum = False
+            except Exception as dw_e:
+                import traceback
+                traceback.print_exc()
+                print(f"Task {task_id} D-Wave Error: {str(dw_e)}")
+                # Fallback to Simulated Annealing if D-Wave fails
+                update_task_status(task_id, "PROCESSING", summary=f"D-Wave failed ({str(dw_e)[:50]}...). Falling back to Simulated Annealing...")
+                use_quantum = False 
+        
+        if not use_quantum or dwave_token is None or DWaveSampler is None:
+            # Re-check use_quantum in case of fallback
             print(f"Task {task_id}: Solving BQM using C++ Neal Sampler (Batched)...")
             
             if neal:

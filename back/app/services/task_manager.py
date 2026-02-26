@@ -26,6 +26,7 @@ def update_task_status(task_id: str, status: str, summary: str = None, result: A
             global_tasks_store[task_id]["result"] = result
         if error is not None:
             global_tasks_store[task_id]["error"] = error
+        print(f"STORE_UPDATE: Task {task_id} -> {status} ({summary or ''})")
 
 def get_task_status(task_id: str) -> dict:
     """Retrieves the full task information."""
