@@ -18,6 +18,8 @@ export default function OptimizationPanel() {
 
     // Form inputs state
     const [config, setConfig] = useState({
+        use_quantum_annealing: false,
+        dwave_token: "",
         max_candidates: 300,
         total_reads: 100,
         batch_size: 100,
@@ -34,10 +36,10 @@ export default function OptimizationPanel() {
     });
 
     const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
+        const { name, value, type, checked } = e.target;
         setConfig(prev => ({
             ...prev,
-            [name]: parseFloat(value) || 0
+            [name]: type === 'checkbox' ? checked : (type === 'text' || type === 'password' ? value : parseFloat(value) || 0)
         }));
     };
 
@@ -96,7 +98,7 @@ export default function OptimizationPanel() {
             <input
                 type="number"
                 name={name}
-                value={config[name]}
+                value={config[name] as number}
                 onChange={handleConfigChange}
                 step={step}
                 className="w-full border rounded px-2 py-1 text-sm bg-gray-50 focus:bg-white transition-colors"
@@ -119,7 +121,7 @@ export default function OptimizationPanel() {
             </div>
 
             {/* Always visible basic controls */}
-            <div className="mb-4">
+            <div className="mb-4 space-y-3">
                 <div className="flex flex-col gap-1">
                     <label className="text-xs font-bold text-muted-foreground">Target Credits</label>
                     <input
@@ -130,6 +132,36 @@ export default function OptimizationPanel() {
                         disabled={taskStatus?.status === "PROCESSING" || taskStatus?.status === "PENDING"}
                     />
                 </div>
+
+                <div className="flex items-center gap-2 p-2 bg-primary/5 rounded border border-primary/20">
+                    <input
+                        type="checkbox"
+                        id="quantum-toggle"
+                        name="use_quantum_annealing"
+                        checked={config.use_quantum_annealing}
+                        onChange={handleConfigChange}
+                        className="w-4 h-4 text-primary rounded focus:ring-primary"
+                        disabled={taskStatus?.status === "PROCESSING" || taskStatus?.status === "PENDING"}
+                    />
+                    <label htmlFor="quantum-toggle" className="text-sm font-bold text-primary cursor-pointer select-none">
+                        Use Real D-Wave QPU
+                    </label>
+                </div>
+
+                {config.use_quantum_annealing && (
+                    <div className="flex flex-col gap-1 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <label className="text-xs font-bold text-muted-foreground text-primary">D-Wave Token (Required)</label>
+                        <input
+                            type="password"
+                            name="dwave_token"
+                            value={config.dwave_token}
+                            onChange={handleConfigChange}
+                            placeholder="DEV-..."
+                            className="w-full border border-primary/50 rounded px-3 py-2 text-sm focus:outline-primary transition-all"
+                            disabled={taskStatus?.status === "PROCESSING" || taskStatus?.status === "PENDING"}
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Collapsible advanced settings area */}

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tech Stack Diagram</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #ffffff;
+            padding: 40px;
+        }
+
+        .diagram-container {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .user {
+            width: 80px;
+            height: 80px;
+            background-color: #e2e8f0;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .user svg {
+            width: 50px;
+            height: 50px;
+            fill: #64748b;
+        }
+
+        .railway-envelope {
+            border: 3px solid #0B0D0E;
+            padding: 90px 80px 80px 80px;
+            position: relative;
+            background: #f8fafc;
+            border-radius: 16px;
+        }
+
+        .railway-icon {
+            position: absolute;
+            top: -26px;
+            left: 30px;
+            background: #f8fafc;
+            padding: 0 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            font-size: 26px;
+            color: #0B0D0E;
+            font-family: sans-serif;
+        }
+
+        .railway-icon svg {
+            height: 48px;
+            width: 48px;
+            fill: #0B0D0E;
+        }
+
+        .docker-envelope {
+            border: 2px dashed #0ea5e9;
+            padding: 60px 50px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 60px;
+            background: #ffffff;
+            border-radius: 12px;
+        }
+
+        .docker-icon {
+            position: absolute;
+            top: -24px;
+            left: 20px;
+            background: #ffffff;
+            padding: 0 10px;
+            display: flex;
+            align-items: center;
+        }
+
+        .docker-icon img {
+            height: 96px;
+            /* 48px * 2.0 */
+            object-fit: contain;
+        }
+
+        .node {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .node img {
+            width: auto;
+            object-fit: contain;
+        }
+
+        .node-nextjs img {
+            height: 135px;
+            /* 90px * 1.5 */
+        }
+
+        .node-fastapi img {
+            height: 153px;
+            /* 90px * 1.7 */
+        }
+
+        .node-python img {
+            height: 125px;
+        }
+
+        .col-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 50px;
+        }
+
+        .arrow-horizontal {
+            width: 100px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .arrow-vertical {
+            width: 20px;
+            height: 60px;
+            flex-shrink: 0;
+        }
+
+        svg.arrow line {
+            stroke: #64748b;
+            stroke-width: 3;
+        }
+
+        svg.arrow polygon {
+            fill: #64748b;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="diagram-container">
+
+        <!-- User Icon -->
+        <div class="user">
+            <svg viewBox="0 0 24 24">
+                <path
+                    d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+            </svg>
+        </div>
+
+        <!-- Arrow: User <-> Railway -->
+        <svg class="arrow arrow-horizontal" viewBox="0 0 80 20">
+            <line x1="5" y1="10" x2="75" y2="10" />
+            <polygon points="75,10 65,5 65,15" />
+            <polygon points="5,10 15,5 15,15" />
+        </svg>
+
+        <!-- Railway Boundary Box -->
+        <div class="railway-envelope">
+
+            <div class="railway-icon">
+                <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <title>Railway</title>
+                    <path
+                        d="M11.968 0C5.358 0 0 5.358 0 11.968s5.358 11.968 11.968 11.968 11.968-5.358 11.968-11.968S18.578 0 11.968 0zm6.811 11.168L12.016 14.86l-6.732-3.703 6.698-3.692 6.797 3.703zM5.313 12.82l6.685 3.682v7.355C6.772 22.84 2.503 18.006 5.313 12.82zm8.019 11.036v-7.352l6.709-3.684c1.848 4.195.12 8.761-4.72 10.371a11.933 11.933 0 01-1.989.665zM12.016 1.838l6.757 3.717v7.417l-6.757-3.717V1.838zM5.275 5.531l6.741-3.71v7.435l-6.741 3.71V5.531z" />
+                </svg>
+                Railway
+            </div>
+
+            <!-- Docker Boundary Box -->
+            <div class="docker-envelope">
+
+                <div class="docker-icon">
+                    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/docker/docker-original-wordmark.svg"
+                        alt="Docker">
+                </div>
+
+                <!-- Next.js -->
+                <div class="node node-nextjs">
+                    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/nextjs/nextjs-original-wordmark.svg"
+                        alt="Next.js"
+                        onerror="this.src='https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/nextjs/nextjs-original.svg'">
+                </div>
+
+                <!-- Arrow: Next.js <-> FastAPI -->
+                <svg class="arrow arrow-horizontal" viewBox="0 0 80 20">
+                    <line x1="5" y1="10" x2="75" y2="10" />
+                    <polygon points="75,10 65,5 65,15" />
+                    <polygon points="5,10 15,5 15,15" />
+                </svg>
+
+                <div class="col-layout">
+
+                    <!-- FastAPI -->
+                    <div class="node node-fastapi">
+                        <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/fastapi/fastapi-original-wordmark.svg"
+                            alt="FastAPI"
+                            onerror="this.src='https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/fastapi/fastapi-original.svg'">
+                    </div>
+
+                    <!-- Arrow: FastAPI <-> Python (Background Task) -->
+                    <svg class="arrow arrow-vertical" viewBox="0 0 20 60">
+                        <line x1="10" y1="5" x2="10" y2="55" />
+                        <!-- double headed vertical arrow -->
+                        <polygon points="10,55 5,45 15,45" />
+                        <polygon points="10,5 5,15 15,15" />
+                    </svg>
+
+                    <!-- Python / SA Optimization -->
+                    <div class="node node-python">
+                        <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/python/python-original-wordmark.svg"
+                            alt="Python">
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+
+</html>

@@ -12,6 +12,8 @@ class OptimizationRequest(BaseModel):
     target_credits: Optional[float] = 21.0
     
     # Annealing configs
+    use_quantum_annealing: Optional[bool] = False
+    dwave_token: Optional[str] = None
     max_candidates: Optional[int] = 300
     total_reads: Optional[int] = 100
     batch_size: Optional[int] = 100

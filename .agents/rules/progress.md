@@ -1,3 +1,7 @@
+---
+trigger: manual
+---
+
 # 📌 Project Progress (Session Checkpoint)
 
 현재까지 진행된 양자 컴퓨팅 기반 시간표 최적화 웹 서비스(프로토타입)의 상태와 향후 개발되어야 할 남은 작업들을 정리한 문서입니다.

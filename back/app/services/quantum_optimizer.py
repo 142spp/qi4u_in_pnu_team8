@@ -12,6 +12,12 @@ try:
 except ImportError:
     neal = None
 
+try:
+    from dwave.system import DWaveSampler, EmbeddingComposite
+except ImportError:
+    DWaveSampler = None
+    EmbeddingComposite = None
+
 def optimize_timetable(task_id: str, preferences: dict):
     """
     Background worker function that builds the BQM and solves it via Simulated Annealing.
@@ -66,35 +72,48 @@ def optimize_timetable(task_id: str, preferences: dict):
 
         bqm = build_timetable_bqm(lectures, preferences, progress_callback=bqm_progress)
 
-        # 3. Submit to Simulated Annealing Sampler (Batch Processing)
-        print(f"Task {task_id}: Solving BQM using C++ Neal Sampler (Batched)...")
-        
-        if neal:
-            sampler = neal.SimulatedAnnealingSampler()
-        else:
-            sampler = dimod.SimulatedAnnealingSampler()
-            
+        # 3. Submit to Sampler (Simulated or D-Wave)
         TOTAL_READS = preferences.get("total_reads", 100)
-        BATCH_SIZE = preferences.get("batch_size", 100)
-        
-        # Ensure minimums
-        if BATCH_SIZE <= 0: BATCH_SIZE = 100
-        if TOTAL_READS <= 0: TOTAL_READS = 100
-        
-        num_batches = max(1, TOTAL_READS // BATCH_SIZE)
-        
-        all_samplesets = []
-        for b in range(num_batches):
-            progress_pct = int(((b + 1) / num_batches) * 100)
-            update_task_status(task_id, "PROCESSING", summary=f"Quantum Optimization in progress... ({progress_pct}%)")
+        if TOTAL_READS <= 0:
+            TOTAL_READS = 100
+
+        use_quantum = preferences.get("use_quantum_annealing", False)
+        dwave_token = preferences.get("dwave_token", None)
+
+        if use_quantum and dwave_token and DWaveSampler is not None:
+            print(f"Task {task_id}: Solving BQM using D-Wave Quantum Sampler...")
+            update_task_status(task_id, "PROCESSING", summary="Quantum Optimization in progress on QPU...")
             
-            # Perform batch sampling
-            batch_sampleset = sampler.sample(bqm, num_reads=BATCH_SIZE)
-            all_samplesets.append(batch_sampleset)
+            sampler = EmbeddingComposite(DWaveSampler(token=dwave_token))
             
-        # Concatenate all results
-        sampleset = dimod.concatenate(all_samplesets)
-        
+            # For D-Wave, we generally just send all reads in one go.
+            sampleset = sampler.sample(bqm, num_reads=TOTAL_READS)
+        else:
+            print(f"Task {task_id}: Solving BQM using C++ Neal Sampler (Batched)...")
+            
+            if neal:
+                sampler = neal.SimulatedAnnealingSampler()
+            else:
+                sampler = dimod.SimulatedAnnealingSampler()
+                
+            BATCH_SIZE = preferences.get("batch_size", 100)
+            if BATCH_SIZE <= 0:
+                BATCH_SIZE = 100
+            
+            num_batches = max(1, TOTAL_READS // BATCH_SIZE)
+            
+            all_samplesets = []
+            for b in range(num_batches):
+                progress_pct = int(((b + 1) / num_batches) * 100)
+                update_task_status(task_id, "PROCESSING", summary=f"Simulated Annealing in progress... ({progress_pct}%)")
+                
+                # Perform batch sampling
+                batch_sampleset = sampler.sample(bqm, num_reads=BATCH_SIZE)
+                all_samplesets.append(batch_sampleset)
+                
+            # Concatenate all results
+            sampleset = dimod.concatenate(all_samplesets)
+
         # 4. Parse Top 5 Unique Results
         # sampleset is ordered from lowest energy to highest
         top_schedules = []

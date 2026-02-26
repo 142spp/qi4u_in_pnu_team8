@@ -5,3 +5,4 @@ dimod
 dwave-neal
 pydantic
 python-multipart
+dwave-system
