@@ -165,8 +165,8 @@ export default function OptimizationPanel() {
             </div>
 
             {/* Collapsible advanced settings area */}
-            <div className={`transition-all duration-300 overflow-hidden flex-1 flex flex-col ${showSettings ? 'opacity-100 max-h-[800px] mb-4' : 'opacity-0 max-h-0'}`}>
-                <div className="overflow-y-auto pr-2 flex-1 pb-2 scrollbar-thin space-y-4">
+            <div className={`transition-all duration-300 overflow-hidden flex-1 min-h-0 flex flex-col ${showSettings ? 'opacity-100 max-h-[800px] mb-4' : 'opacity-0 max-h-0'}`}>
+                <div className="overflow-y-auto pr-2 flex-1 min-h-0 pb-2 scrollbar-thin space-y-4">
                     <div className="p-3 bg-muted/50 rounded border space-y-3">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-primary border-b pb-1">Compute Limits</h4>
                         <div className="grid grid-cols-2 gap-3">
